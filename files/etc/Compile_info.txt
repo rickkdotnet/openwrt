@@ -1,6 +1,6 @@
-OpenWrt 21.02-snapshot r16053-f066ee2ad5 / 2021-04-29 15:42
+OpenWrt 21.02-snapshot-rickk r16055+3-d57e480394 / 2021-04-30 22:31
 ---
-main      2021-04-28 f066ee2 mac80211: minstrel_ht: fix issue in calcu
+main      2021-04-30 bfeb72b first merge with main openwrt source Merg
 luci      2021-04-28 33aa61f luci-app-attendedsysupgrade: add target i
-packages  2021-04-28 8a69257 Merge pull request #15526 from 1715173329
+packages  2021-04-30 d37803d adblock: update to 4.1.2
 routing   2021-04-02 5b4d4c7 bird2: Makefile polishing
