@@ -39,6 +39,7 @@ wps_catch_credentials() {
 }
 
 if [ "$ACTION" = "pressed" -a "$BUTTON" = "wps" ]; then
+	logger "WPS button pressed, looking for active radios"
 	wps_done=0
 	ubusobjs="$( ubus -S list hostapd.* )"
 	for ubusobj in $ubusobjs; do

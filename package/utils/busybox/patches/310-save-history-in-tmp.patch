@@ -1,0 +1,11 @@
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -14396,7 +14396,7 @@ int ash_main(int argc UNUSED_PARAM, char
+ 		if (iflag) {
+ 			const char *hp = lookupvar("HISTFILE");
+ 			if (!hp) {
+-				hp = lookupvar("HOME");
++				hp = "/tmp";
+ 				if (hp) {
+ 					INT_OFF;
+ 					hp = concat_path_file(hp, ".ash_history");

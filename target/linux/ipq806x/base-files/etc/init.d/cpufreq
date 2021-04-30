@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+
+START=15
+
+boot() {
+  # Select 'ondemand'=scaling or 'performance'=always max freq
+  echo ondemand > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor
+  echo ondemand > /sys/devices/system/cpu/cpufreq/policy1/scaling_governor
+
+  # Effective only with ondemand
+  echo 600000 > /sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq
+  echo 600000 > /sys/devices/system/cpu/cpufreq/policy1/scaling_min_freq
+  echo 20 > /sys/devices/system/cpu/cpufreq/ondemand/sampling_down_factor
+  echo 50 > /sys/devices/system/cpu/cpufreq/ondemand/up_threshold
+}
+

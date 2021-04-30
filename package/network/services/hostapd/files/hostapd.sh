@@ -665,6 +665,11 @@ hostapd_set_bss_options() {
 		set_default wps_manufacturer "www.openwrt.org"
 		set_default wps_independent 1
 
+		# Set WPS label pin to original Netgear value stored in art partition
+		# Value for wps_pin can be overridden by /etc/config/wireless
+#		local PINdefault="$(dd if=/dev/mtdblock3 bs=1 skip=18 count=8 2>/dev/null)"
+#		set_default wps_pin "$PINdefault"
+
 		wps_state=2
 		[ -n "$wps_not_configured" ] && wps_state=1
 

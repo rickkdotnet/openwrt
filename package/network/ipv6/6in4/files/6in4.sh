@@ -25,7 +25,7 @@ test_6in4_rfc1918()
 
 proto_6in4_update() {
 	sh -c '
-		timeout=5
+		timeout=8
 
 		(while [ $((timeout--)) -gt 0 ]; do
 			sleep 1
