@@ -1,0 +1,194 @@
+From 93549c7cd8f69d4364d8e5e7613419c30f51ae67 Mon Sep 17 00:00:00 2001
+From: Stijn Tintel <stijn@linux-ipv6.be>
+Date: Mon, 5 Dec 2022 14:51:23 +0200
+Subject: [PATCH] nl80211: add attributes to set CoDeL params
+
+Signed-off-by: Stijn Tintel <stijn@linux-ipv6.be>
+---
+ include/net/cfg80211.h       | 10 ++++++++++
+ include/uapi/linux/nl80211.h |  8 ++++++++
+ net/wireless/nl80211.c       | 38 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 56 insertions(+)
+
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -27,6 +27,7 @@
+ #include <linux/ieee80211.h>
+ #include <linux/net.h>
+ #include <linux/rfkill.h>
++#include <net/codel.h>
+ #include <net/regulatory.h>
+ #include <net/netlink.h>
+ 
+@@ -2949,6 +2950,9 @@ enum cfg80211_connect_params_changed {
+  * @WIPHY_PARAM_TXQ_LIMIT: TXQ packet limit has been changed
+  * @WIPHY_PARAM_TXQ_MEMORY_LIMIT: TXQ memory limit has been changed
+  * @WIPHY_PARAM_TXQ_QUANTUM: TXQ scheduler quantum
++ * @WIPHY_PARAM_CODEL_TARGET: CoDeL target has been changed
++ * @WIPHY_PARAM_CODEL_INTERVAL: CoDeL interval has been changed
++ * @WIPHY_PARAM_CODEL_ECN: CoDeL ECN marking has been changed
+  */
+ enum wiphy_params_flags {
+ 	WIPHY_PARAM_RETRY_SHORT		= 1 << 0,
+@@ -2960,6 +2964,9 @@ enum wiphy_params_flags {
+ 	WIPHY_PARAM_TXQ_LIMIT		= 1 << 6,
+ 	WIPHY_PARAM_TXQ_MEMORY_LIMIT	= 1 << 7,
+ 	WIPHY_PARAM_TXQ_QUANTUM		= 1 << 8,
++	WIPHY_PARAM_CODEL_TARGET	= 1 << 9,
++	WIPHY_PARAM_CODEL_INTERVAL	= 1 << 10,
++	WIPHY_PARAM_CODEL_ECN		= 1 << 11,
+ };
+ 
+ #define IEEE80211_DEFAULT_AIRTIME_WEIGHT	256
+@@ -5040,6 +5047,8 @@ struct wiphy_iftype_akm_suites {
+  * @mbssid_max_ema_profile_periodicity: maximum profile periodicity supported by
+  *	the driver. Setting this field to a non-zero value indicates that the
+  *	driver supports enhanced multi-BSSID advertisements (EMA AP).
++ *
++ * @cparams: a pointer to the codel_params structure
+  */
+ struct wiphy {
+ 	struct mutex mtx;
+@@ -5190,6 +5199,8 @@ struct wiphy {
+ 	u8 mbssid_max_interfaces;
+ 	u8 ema_max_profile_periodicity;
+ 
++	struct codel_params cparams;
++
+ 	char priv[] __aligned(NETDEV_ALIGN);
+ };
+ 
+--- a/include/uapi/linux/nl80211.h
++++ b/include/uapi/linux/nl80211.h
+@@ -2618,6 +2618,10 @@ enum nl80211_commands {
+  * @NL80211_ATTR_WIPHY_ANTENNA_GAIN: Configured antenna gain. Used to reduce
+  *	transmit power to stay within regulatory limits. u32, dBi.
+  *
++ * @NL80211_ATTR_CODEL_TARGET
++ * @NL80211_ATTR_CODEL_INTERVAL
++ * @NL80211_ATTR_CODEL_ECN
++ *
+  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
+  * @NL80211_ATTR_MAX: highest attribute number currently defined
+  * @__NL80211_ATTR_AFTER_LAST: internal use
+@@ -3128,6 +3132,10 @@ enum nl80211_attrs {
+ 
+ 	NL80211_ATTR_WIPHY_ANTENNA_GAIN,
+ 
++	NL80211_ATTR_CODEL_TARGET,
++	NL80211_ATTR_CODEL_INTERVAL,
++	NL80211_ATTR_CODEL_ECN,
++
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+ 	__NL80211_ATTR_AFTER_LAST,
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -803,6 +803,10 @@ static const struct nla_policy nl80211_p
+ 	[NL80211_ATTR_MBSSID_ELEMS] = { .type = NLA_NESTED },
+ 	[NL80211_ATTR_RADAR_BACKGROUND] = { .type = NLA_FLAG },
+ 	[NL80211_ATTR_WIPHY_ANTENNA_GAIN] = { .type = NLA_U32 },
++	[NL80211_ATTR_CODEL_TARGET] = { .type = NLA_U32 },
++	[NL80211_ATTR_CODEL_INTERVAL] = { .type = NLA_U32 },
++	[NL80211_ATTR_CODEL_ECN] = NLA_POLICY_RANGE(NLA_U8, 0, 1),
++
+ };
+ 
+ /* policy for the key attributes */
+@@ -2868,6 +2872,21 @@ static int nl80211_send_wiphy(struct cfg
+ 		if (nl80211_put_mbssid_support(&rdev->wiphy, msg))
+ 			goto nla_put_failure;
+ 
++		state->split_start++;
++		break;
++	case 17:
++		if (nla_put_u32(msg, NL80211_ATTR_CODEL_TARGET,
++				rdev->wiphy.cparams.target))
++			goto nla_put_failure;
++
++		if (nla_put_u32(msg, NL80211_ATTR_CODEL_INTERVAL,
++				rdev->wiphy.cparams.interval))
++			goto nla_put_failure;
++
++		if (nla_put_u8(msg, NL80211_ATTR_CODEL_ECN,
++				rdev->wiphy.cparams.ecn))
++			goto nla_put_failure;
++
+ 		/* done */
+ 		state->split_start = 0;
+ 		break;
+@@ -3288,6 +3307,8 @@ static int nl80211_set_wiphy(struct sk_b
+ 	u32 frag_threshold = 0, rts_threshold = 0;
+ 	u8 coverage_class = 0;
+ 	u32 txq_limit = 0, txq_memory_limit = 0, txq_quantum = 0;
++	u32 codel_target = 0, codel_interval = 0;
++	u8 codel_ecn = 0;
+ 
+ 	rtnl_lock();
+ 	/*
+@@ -3566,11 +3587,31 @@ static int nl80211_set_wiphy(struct sk_b
+ 		changed |= WIPHY_PARAM_TXQ_QUANTUM;
+ 	}
+ 
++	if (info->attrs[NL80211_ATTR_CODEL_TARGET]) {
++		codel_target = nla_get_u32(
++			info->attrs[NL80211_ATTR_CODEL_TARGET]);
++		changed |= WIPHY_PARAM_CODEL_TARGET;
++	}
++
++	if (info->attrs[NL80211_ATTR_CODEL_INTERVAL]) {
++		codel_interval = nla_get_u32(
++			info->attrs[NL80211_ATTR_CODEL_INTERVAL]);
++		changed |= WIPHY_PARAM_CODEL_INTERVAL;
++	}
++
++	if (info->attrs[NL80211_ATTR_CODEL_ECN]) {
++		codel_ecn = nla_get_u8(
++			info->attrs[NL80211_ATTR_CODEL_ECN]);
++		changed |= WIPHY_PARAM_CODEL_ECN;
++	}
++
+ 	if (changed) {
+ 		u8 old_retry_short, old_retry_long;
+ 		u32 old_frag_threshold, old_rts_threshold;
+ 		u8 old_coverage_class;
+ 		u32 old_txq_limit, old_txq_memory_limit, old_txq_quantum;
++		u32 old_codel_target, old_codel_interval;
++		u8 old_codel_ecn;
+ 
+ 		if (!rdev->ops->set_wiphy_params) {
+ 			result = -EOPNOTSUPP;
+@@ -3585,6 +3626,9 @@ static int nl80211_set_wiphy(struct sk_b
+ 		old_txq_limit = rdev->wiphy.txq_limit;
+ 		old_txq_memory_limit = rdev->wiphy.txq_memory_limit;
+ 		old_txq_quantum = rdev->wiphy.txq_quantum;
++		old_codel_target = rdev->wiphy.cparams.target;
++		old_codel_interval = rdev->wiphy.cparams.interval;
++		old_codel_ecn = rdev->wiphy.cparams.ecn;
+ 
+ 		if (changed & WIPHY_PARAM_RETRY_SHORT)
+ 			rdev->wiphy.retry_short = retry_short;
+@@ -3602,6 +3646,12 @@ static int nl80211_set_wiphy(struct sk_b
+ 			rdev->wiphy.txq_memory_limit = txq_memory_limit;
+ 		if (changed & WIPHY_PARAM_TXQ_QUANTUM)
+ 			rdev->wiphy.txq_quantum = txq_quantum;
++		if (changed & WIPHY_PARAM_CODEL_TARGET)
++			rdev->wiphy.cparams.target = codel_target;
++		if (changed & WIPHY_PARAM_CODEL_INTERVAL)
++			rdev->wiphy.cparams.interval = codel_interval;
++		if (changed & WIPHY_PARAM_CODEL_ECN)
++			rdev->wiphy.cparams.ecn = codel_ecn;
+ 
+ 		result = rdev_set_wiphy_params(rdev, changed);
+ 		if (result) {
+@@ -3613,6 +3663,10 @@ static int nl80211_set_wiphy(struct sk_b
+ 			rdev->wiphy.txq_limit = old_txq_limit;
+ 			rdev->wiphy.txq_memory_limit = old_txq_memory_limit;
+ 			rdev->wiphy.txq_quantum = old_txq_quantum;
++			rdev->wiphy.cparams.target = old_codel_target;
++			rdev->wiphy.cparams.interval = old_codel_interval;
++			rdev->wiphy.cparams.ecn = old_codel_ecn;
++
+ 			goto out;
+ 		}
+ 	}

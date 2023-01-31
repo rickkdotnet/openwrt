@@ -1,0 +1,149 @@
+--- a/src/defaults.sh
++++ b/src/defaults.sh
+@@ -28,28 +28,18 @@
+ 
+ # handling of specific important binaries
+ [ -z "$TC" ] && TC=tc_wrapper
+-[ -z "$TC_BINARY" ] && TC_BINARY=$(command -v tc)
++[ -z "$TC_BINARY" ] && TC_BINARY=$(which tc)
+ [ -z "$IP" ] && IP=ip_wrapper
+-[ -z "$IP_BINARY" ] && IP_BINARY=$(command -v ip)
++[ -z "$IP_BINARY" ] && IP_BINARY=$(which ip)
+ [ -z "$IPTABLES" ] && IPTABLES=iptables_wrapper
+-[ -z "$IPTABLES_BINARY" ] && IPTABLES_BINARY=$(command -v iptables)
+-[ -z "$IPTABLES_BINARY" ] && IPTABLES_BINARY=$(command -v iptables-nft)
++[ -z "$IPTABLES_BINARY" ] && IPTABLES_BINARY=$(which iptables)
+ [ -z "$IP6TABLES" ] && IP6TABLES=ip6tables_wrapper
+-[ -z "$IP6TABLES_BINARY" ] && IP6TABLES_BINARY=$(command -v ip6tables)
+-[ -z "$IP6TABLES_BINARY" ] && IP6TABLES_BINARY=$(command -v ip6tables-nft)
++[ -z "$IP6TABLES_BINARY" ] && IP6TABLES_BINARY=$(which ip6tables)
+ [ -z "$IPTABLES_ARGS" ] && IPTABLES_ARGS="-w 1"
+ 
+ 
+ # Try modprobe first, fall back to insmod
+-if [ -z "$INSMOD" ]; then
+-	INSMOD=$(command -v modprobe)
+-	if [ -n "$INSMOD" ]; then
+-		INSMOD="${INSMOD} -q"
+-	else
+-		INSMOD=$(command -v insmod)
+-	fi
+-fi
+-
++[ -z "$INSMOD" ] && { INSMOD=$(which modprobe) || INSMOD=$(which insmod); }
+ [ -z "$TARGET" ] && TARGET="5ms"
+ [ -z "$IPT_MASK" ] && IPT_MASK="0xff" # to disable: set mask to 0xffffffff
+ #sm: we need the functions above before trying to set the ingress IFB device
+@@ -108,4 +98,4 @@ SILENT=0
+ IPT_TRANS_LOG="${SQM_STATE_DIR}/${IFACE}.iptables.log"
+ 
+ # These are the modules that do_modules() will attempt to load
+-ALL_MODULES="sch_$QDISC sch_ingress act_mirred cls_fw cls_flow cls_u32 sch_htb"
++ALL_MODULES="act_ipt sch_$QDISC sch_ingress act_mirred cls_fw cls_flow cls_u32 sch_htb sch_hfsc nss-ifb"
+--- /dev/null
++++ b/src/nss.qos
+@@ -0,0 +1,100 @@
++################################################################################
++# nss.qos (HW Accelerated Simple Traffic Shaper)
++#
++# modified by rickk to work with NSS fq_codel shaper
++#
++################################################################################
++
++. ${SQM_LIB_DIR}/defaults.sh
++
++################################################################################
++
++ipt_setup() {
++
++    IFACE=eth0
++
++    ipt -t mangle -N QOS_MARK_${IFACE}
++
++    ipt -t mangle -A QOS_MARK_${IFACE} -j MARK --set-mark 0x2/${IPT_MASK}
++    ipt -t mangle -A QOS_MARK_${IFACE} -m dscp --dscp-class CS1 -j MARK --set-mark 0x3/${IPT_MASK}
++    ipt -t mangle -A QOS_MARK_${IFACE} -m dscp --dscp-class CS6 -j MARK --set-mark 0x1/${IPT_MASK}
++    ipt -t mangle -A QOS_MARK_${IFACE} -m dscp --dscp-class EF -j MARK --set-mark 0x1/${IPT_MASK}
++    ipt -t mangle -A QOS_MARK_${IFACE} -m dscp --dscp-class AF42 -j MARK --set-mark 0x1/${IPT_MASK}
++    ipt -t mangle -A QOS_MARK_${IFACE} -m tos  --tos Minimize-Delay -j MARK --set-mark 0x1/${IPT_MASK}
++
++    # Turn it on. Preserve classification if already performed
++    #
++    #sm: is it correct to do this in $IFACE? Should ingress not be on $DEV? since HTB acts on $DEV?
++    #
++    # ZERO also does not work on $DEV (that is the IFB will still see the
++    # incoming ToS bits whether we squash or not)
++    #
++    # ZERO is still useful to protect internal machines...
++    if [ "$ZERO_DSCP_INGRESS" = "1" ]; then
++        sqm_debug "Squashing differentiated services code points (DSCP) from ingress."
++        ipt -t mangle -I PREROUTING -i $IFACE -m dscp ! --dscp 0 -j DSCP --set-dscp-class be
++    else
++        sqm_debug "Keeping differentiated services code points (DSCP) from ingress."
++        ipt -t mangle -A PREROUTING -i $IFACE -m mark --mark 0x00/${IPT_MASK} -g QOS_MARK_${IFACE}
++    fi
++
++    ipt -t mangle -A POSTROUTING -o $IFACE -m mark --mark 0x00/${IPT_MASK} -g QOS_MARK_${IFACE}
++
++
++    ipt -t mangle -A OUTPUT -p udp -m multiport --ports 123,53 -j DSCP --set-dscp-class AF42
++
++
++}
++
++
++
++cake_egress() {
++    sqm_debug "Nothing here."
++}
++
++egress() {
++
++    IFACE=eth0
++
++    BURST="$(get_burst ${MTU:-1514} ${UPLINK} ${ESHAPER_BURST_DUR_US})"
++    BURST=${BURST:-1514}
++
++    $TC qdisc add dev $IFACE root handle 1: nsstbl rate ${UPLINK}kbit burst $BURST
++    $TC qdisc add dev $IFACE parent 1: handle 10: nssfq_codel limit 4096 flows 1024 quantum 300 target 5ms interval 100ms set_default
++
++    $TC filter add dev $IFACE parent 1:0 protocol ip prio 0 u32 match ip protocol 1 0xff flowid 1:13
++
++    $TC filter add dev $IFACE parent 1:0 protocol ipv6 prio 1 u32 match ip protocol 1 0xff flowid 1:13
++}
++
++
++cake_ingress() {
++    sqm_debug "Nothing here."
++}
++
++ingress() {
++
++    #cut off ifb4
++    DEV=`echo $DEV | cut -c 5-`
++    printf $DEV > /sys/module/nss_ifb/parameters/nss_dev_name
++    DEV=nssifb
++
++    BURST="350Kb"
++
++    BURST="$(get_burst ${MTU:-1514} ${DOWNLINK} ${ISHAPER_BURST_DUR_US})"
++    BURST=${BURST:-1514}
++
++    $TC qdisc add dev $DEV root handle 1: nsstbl rate ${DOWNLINK}kbit burst ${BURST}
++    $TC qdisc add dev $DEV parent 1: handle 10: nssfq_codel limit 4096 flows 1024 quantum 1514 target 5ms interval 100ms set_default
++
++
++    $IP link set up nssifb
++
++}
++
++sqm_prepare_script() {
++    do_modules
++    #quick workaround to fill dropdown, will fix this later
++    #touch /var/run/sqm/available_qdiscs/nssfq_codel
++    ipt_setup
++}
+--- /dev/null
++++ b/src/nss.qos.help
+@@ -0,0 +1 @@
++EXperimental HW-accelerated traffic shaping support. Select fq_codel as discipline and nss.qos as setup script.

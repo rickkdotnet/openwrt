@@ -1,0 +1,71 @@
+From d4b364bb354fafdd936c820cf12bfbf98ba87a72 Mon Sep 17 00:00:00 2001
+From: Stijn Tintel <stijn@linux-ipv6.be>
+Date: Mon, 5 Dec 2022 15:53:49 +0200
+Subject: [PATCH] mac80211: use CoDeL params from wiphy struct
+
+Signed-off-by: Stijn Tintel <stijn@linux-ipv6.be>
+---
+ net/mac80211/sta_info.c | 14 ++++++++------
+ net/mac80211/tx.c       |  7 ++++---
+ 2 files changed, 12 insertions(+), 9 deletions(-)
+
+--- a/net/mac80211/sta_info.c
++++ b/net/mac80211/sta_info.c
+@@ -515,9 +515,9 @@ struct sta_info *sta_info_alloc(struct i
+ 	sta->sta.max_rc_amsdu_len = IEEE80211_MAX_MPDU_LEN_HT_BA;
+ 
+ 	sta->cparams.ce_threshold = CODEL_DISABLED_THRESHOLD;
+-	sta->cparams.target = MS2TIME(20);
+-	sta->cparams.interval = MS2TIME(100);
+-	sta->cparams.ecn = true;
++	sta->cparams.target = MS2TIME(hw->wiphy->cparams.target);
++	sta->cparams.interval = MS2TIME(hw->wiphy->cparams.interval);
++	sta->cparams.ecn = hw->wiphy->cparams.ecn;
+ 
+ 	sta_dbg(sdata, "Allocated STA %pM\n", sta->sta.addr);
+ 
+@@ -2555,6 +2555,8 @@ unsigned long ieee80211_sta_last_active(
+ 
+ static void sta_update_codel_params(struct sta_info *sta, u32 thr)
+ {
++	struct ieee80211_hw *hw = &sta->sdata->local->hw;
++
+ 	if (!sta->sdata->local->ops->wake_tx_queue)
+ 		return;
+ 
+@@ -2563,9 +2565,9 @@ static void sta_update_codel_params(stru
+ 		sta->cparams.interval = MS2TIME(300);
+ 		sta->cparams.ecn = false;
+ 	} else {
+-		sta->cparams.target = MS2TIME(20);
+-		sta->cparams.interval = MS2TIME(100);
+-		sta->cparams.ecn = true;
++		sta->cparams.target = MS2TIME(hw->wiphy->cparams.target);
++		sta->cparams.interval = MS2TIME(hw->wiphy->cparams.interval);
++		sta->cparams.ecn = hw->wiphy->cparams.ecn;
+ 	}
+ }
+ 
+--- a/net/mac80211/tx.c
++++ b/net/mac80211/tx.c
+@@ -1553,6 +1553,7 @@ void ieee80211_txq_set_params(struct iee
+ int ieee80211_txq_setup_flows(struct ieee80211_local *local)
+ {
+ 	struct fq *fq = &local->fq;
++	struct ieee80211_hw *hw = &local->hw;
+ 	int ret;
+ 	int i;
+ 	bool supp_vht = false;
+@@ -1583,9 +1584,9 @@ int ieee80211_txq_setup_flows(struct iee
+ 		fq->memory_limit = 4 << 20; /* 4 Mbytes */
+ 
+ 	codel_params_init(&local->cparams);
+-	local->cparams.interval = MS2TIME(100);
+-	local->cparams.target = MS2TIME(20);
+-	local->cparams.ecn = true;
++	local->cparams.interval = MS2TIME(hw->wiphy->cparams.interval);
++	local->cparams.target = MS2TIME(hw->wiphy->cparams.target);
++	local->cparams.ecn = hw->wiphy->cparams.ecn;
+ 
+ 	local->cvars = kcalloc(fq->flows_cnt, sizeof(local->cvars[0]),
+ 			       GFP_KERNEL);

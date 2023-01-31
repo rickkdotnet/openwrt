@@ -1,0 +1,19 @@
+--- a/htdocs/luci-static/resources/statistics/rrdtool/definitions/sqm.js
++++ b/htdocs/luci-static/resources/statistics/rrdtool/definitions/sqm.js
+@@ -15,11 +15,13 @@ return baseclass.extend({
+ 			alt_autoscale: true,
+ 			number_format: "%5.0lf",
+ 			data: {
+-				types: [ "qdisc_bytes", "qdisc_backlog", "qdisc_drops" ],
++				types:["qdisc_backlog","qdisc_drops","qdisc_overlimits","qdisc_requeues","qdisc_packets"],
+ 				options: {
+-					qdisc_bytes: { title: "kb/s:", overlay: true, noarea: false, color: "0000ff", transform_rpn: "125,/" },
++                                        qdisc_packets:{title:"packets/s",overlay:true,noarea:true,color:"ff00aa"},
+ 					qdisc_backlog: { title: "Backlog/B:", overlay: true, noarea: true, color: "8000ff" },
+-					qdisc_drops: { title: "Drops/s:", overlay: true, noarea: true, color: "00ffff", }
++					qdisc_drops: { title: "Drops/s:", overlay: true, noarea: true, color: "00ffff", },
++					qdisc_overlimits:{title:"overlimits/s:",overlay:true,noarea:true,color:"00ffaa"},
++		                        qdisc_requeues:{title:"requeues/s:",overlay:true,noarea:true,color:"aaffaa"},
+ 				}
+ 			}
+ 		};

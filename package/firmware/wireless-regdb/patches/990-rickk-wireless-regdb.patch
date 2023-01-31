@@ -1,0 +1,17 @@
+--- a/db.txt
++++ b/db.txt
+@@ -1272,10 +1272,10 @@ country NI: DFS-FCC
+ # NL announcement: https://zoek.officielebekendmakingen.nl/stcrt-2021-49492.pdf
+ # NL law: https://wetten.overheid.nl/BWBR0036378/2021-12-15
+ country NL: DFS-ETSI
+-	(2400 - 2483.5 @ 40), (100 mW)
+-	(5150 - 5250 @ 80), (200 mW), NO-OUTDOOR, AUTO-BW, wmmrule=ETSI
+-	(5250 - 5350 @ 80), (100 mW), NO-OUTDOOR, DFS, AUTO-BW, wmmrule=ETSI
+-	(5470 - 5725 @ 160), (500 mW), DFS, wmmrule=ETSI
++	(2400 - 2483.5 @ 40), (1000 mW)
++	(5150 - 5250 @ 80), (1000 mW), NO-OUTDOOR, AUTO-BW, wmmrule=ETSI
++	(5250 - 5350 @ 80), (1000 mW), NO-OUTDOOR, DFS, AUTO-BW, wmmrule=ETSI
++	(5470 - 5725 @ 160), (1000 mW), DFS, wmmrule=ETSI
+ 	# short range devices (ETSI EN 300 440-1)
+ 	(5725 - 5875 @ 80), (25 mW)
+ 	# WiFi 6E
