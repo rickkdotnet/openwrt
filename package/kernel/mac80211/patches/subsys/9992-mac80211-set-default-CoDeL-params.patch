@@ -18,7 +18,7 @@
 +	codel_params_init(&hw->wiphy->cparams);
 +	hw->wiphy->cparams.target = 8;
 +	hw->wiphy->cparams.interval = 80;
-+	hw->wiphy->cparams.ecn = true;
++	hw->wiphy->cparams.ecn = false;
 +
  	result = ieee80211_txq_setup_flows(local);
  	if (result)

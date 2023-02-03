@@ -1,4 +1,5 @@
-src-git-full packages https://git.openwrt.org/feed/packages.git^2417b74fc
-src-git-full luci https://git.openwrt.org/project/luci.git^f6a7984970
-src-git-full routing https://git.openwrt.org/feed/routing.git^1a87333
+src-git-full packages https://git.openwrt.org/feed/packages.git^4cb3303d5
+src-git-full luci https://git.openwrt.org/project/luci.git^09d68fb2e3
+src-git-full routing https://git.openwrt.org/feed/routing.git^74948d5
 src-git-full telephony https://git.openwrt.org/feed/telephony.git^5087c7e
+src-git mac80211_web_ucode https://codeberg.org/stintel/mac80211-web-ucode.git^da8117b

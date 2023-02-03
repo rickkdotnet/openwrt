@@ -12,7 +12,7 @@
  					qdisc_backlog: { title: "Backlog/B:", overlay: true, noarea: true, color: "8000ff" },
 -					qdisc_drops: { title: "Drops/s:", overlay: true, noarea: true, color: "00ffff", }
 +					qdisc_drops: { title: "Drops/s:", overlay: true, noarea: true, color: "00ffff", },
-+					qdisc_overlimits:{title:"overlimits/s:",overlay:true,noarea:true,color:"00ffaa"},
++					qdisc_overlimits:{title:"overlimits/s:",overlay:true,noarea:true,color:"cccc11"},
 +		                        qdisc_requeues:{title:"requeues/s:",overlay:true,noarea:true,color:"aaffaa"},
  				}
  			}
