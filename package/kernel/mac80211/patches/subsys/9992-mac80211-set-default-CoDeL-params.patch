@@ -17,7 +17,7 @@
 +	pr_err("%s:%d: %s: setting default CoDeL params for phy\n", __FILE__, __LINE__, __func__);
 +	codel_params_init(&hw->wiphy->cparams);
 +	hw->wiphy->cparams.target = 8;
-+	hw->wiphy->cparams.interval = 80;
++	hw->wiphy->cparams.interval = 50;
 +	hw->wiphy->cparams.ecn = false;
 +
  	result = ieee80211_txq_setup_flows(local);
