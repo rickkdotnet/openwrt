@@ -105,7 +105,7 @@
 +    BURST=${BURST:-1514}
 +
 +    $TC qdisc add dev $IFACE root handle 1: nsstbl rate ${UPLINK}kbit burst $BURST
-+    $TC qdisc add dev $IFACE parent 1: handle 10: nssfq_codel limit 1024 flows 1024 quantum 300 target 5ms interval 100ms set_default
++    $TC qdisc add dev $IFACE parent 1: handle 10: nssfq_codel limit 400 flows 1024 quantum 300 target 5ms interval 50ms set_default
 +
 +    $TC filter add dev $IFACE parent 1:0 protocol ip prio 0 u32 match ip protocol 1 0xff flowid 1:13
 +
@@ -130,7 +130,7 @@
 +    BURST=${BURST:-1514}
 +
 +    $TC qdisc add dev $DEV root handle 1: nsstbl rate ${DOWNLINK}kbit burst ${BURST}
-+    $TC qdisc add dev $DEV parent 1: handle 10: nssfq_codel limit 1024 flows 1024 quantum 1514 target 5ms interval 100ms set_default
++    $TC qdisc add dev $DEV parent 1: handle 10: nssfq_codel limit 800 flows 1024 quantum 1514 target 5ms interval 50ms set_default
 +
 +
 +    $IP link set up nssifb
