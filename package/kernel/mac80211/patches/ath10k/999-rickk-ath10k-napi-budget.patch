@@ -1,0 +1,12 @@
+--- a/drivers/net/wireless/ath/ath10k/core.h
++++ b/drivers/net/wireless/ath/ath10k/core.h
+@@ -60,7 +60,8 @@
+ #define ATH10K_KEEPALIVE_MAX_UNRESPONSIVE 3900
+ 
+ /* NAPI poll budget */
+-#define ATH10K_NAPI_BUDGET      64
++/* rickk: https://forum.openwrt.org/t/ipq806x-nss-build-netgear-r7800-tp-link-c2600-linksys-ea8500/82525/2866?u=rickkz0r */
++#define ATH10K_NAPI_BUDGET      8
+ 
+ /* SMBIOS type containing Board Data File Name Extension */
+ #define ATH10K_SMBIOS_BDF_EXT_TYPE 0xF8
