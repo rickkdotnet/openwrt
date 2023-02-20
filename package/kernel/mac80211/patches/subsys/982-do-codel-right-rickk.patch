@@ -1,0 +1,32 @@
+--- a/sta_info.c
++++ b/sta_info.c
+@@ -510,8 +510,8 @@ struct sta_info *sta_info_alloc(struct i
+ 	sta->sta.max_rc_amsdu_len = IEEE80211_MAX_MPDU_LEN_HT_BA;
+ 
+ 	sta->cparams.ce_threshold = CODEL_DISABLED_THRESHOLD;
+-	sta->cparams.target = MS2TIME(20);
+-	sta->cparams.interval = MS2TIME(100);
++	sta->cparams.target = MS2TIME(5);
++	sta->cparams.interval = MS2TIME(50);
+ 	sta->cparams.ecn = true;
+ 
+ 	sta_dbg(sdata, "Allocated STA %pM\n", sta->sta.addr);
+@@ -2579,15 +2579,9 @@ static void sta_update_codel_params(stru
+ 	if (!sta->sdata->local->ops->wake_tx_queue)
+ 		return;
+ 
+-	if (thr && thr < STA_SLOW_THRESHOLD * sta->local->num_sta) {
+-		sta->cparams.target = MS2TIME(50);
+-		sta->cparams.interval = MS2TIME(300);
+-		sta->cparams.ecn = false;
+-	} else {
+-		sta->cparams.target = MS2TIME(20);
+-		sta->cparams.interval = MS2TIME(100);
+-		sta->cparams.ecn = true;
+-	}
++	sta->cparams.target = MS2TIME(5);
++	sta->cparams.interval = MS2TIME(50);
++	sta->cparams.ecn = true;
+ }
+ 
+ void ieee80211_sta_set_expected_throughput(struct ieee80211_sta *pubsta,
