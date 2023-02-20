@@ -1,0 +1,8 @@
+--- a/drivers/net/wireless/ath/ath10k/core.h
++++ b/drivers/net/wireless/ath/ath10k/core.h
+@@ -67,7 +67,7 @@
+ #define ATH10K_KEEPALIVE_MAX_UNRESPONSIVE 3900
+
+ /* NAPI poll budget */
+-#define ATH10K_NAPI_BUDGET      64
++#define ATH10K_NAPI_BUDGET      8
