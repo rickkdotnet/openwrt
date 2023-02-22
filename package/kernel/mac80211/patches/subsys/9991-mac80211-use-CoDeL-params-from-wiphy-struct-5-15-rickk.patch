@@ -1,0 +1,59 @@
+--- a/net/mac80211/sta_info.c
++++ b/net/mac80211/sta_info.c
+@@ -670,9 +670,9 @@ __sta_info_alloc(struct ieee80211_sub_if
+ 	}
+ 
+ 	sta->cparams.ce_threshold = CODEL_DISABLED_THRESHOLD;
+-	sta->cparams.target = MS2TIME(20);
+-	sta->cparams.interval = MS2TIME(100);
+-	sta->cparams.ecn = true;
++	sta->cparams.target = MS2TIME(hw->wiphy->cparams.target);
++	sta->cparams.interval = MS2TIME(hw->wiphy->cparams.interval);
++	sta->cparams.ecn = hw->wiphy->cparams.ecn;
+ 	sta->cparams.ce_threshold_selector = 0;
+ 	sta->cparams.ce_threshold_mask = 0;
+ 
+@@ -2766,15 +2766,11 @@ unsigned long ieee80211_sta_last_active(
+ 
+ static void sta_update_codel_params(struct sta_info *sta, u32 thr)
+ {
+-	if (thr && thr < STA_SLOW_THRESHOLD * sta->local->num_sta) {
+-		sta->cparams.target = MS2TIME(50);
+-		sta->cparams.interval = MS2TIME(300);
+-		sta->cparams.ecn = false;
+-	} else {
+-		sta->cparams.target = MS2TIME(20);
+-		sta->cparams.interval = MS2TIME(100);
+-		sta->cparams.ecn = true;
+-	}
++	struct ieee80211_hw *hw = &sta->sdata->local->hw;
++
++	sta->cparams.target = MS2TIME(hw->wiphy->cparams.target);
++	sta->cparams.interval = MS2TIME(hw->wiphy->cparams.interval);
++	sta->cparams.ecn = hw->wiphy->cparams.ecn;
+ }
+ 
+ void ieee80211_sta_set_expected_throughput(struct ieee80211_sta *pubsta,
+--- a/net/mac80211/tx.c
++++ b/net/mac80211/tx.c
+@@ -1603,6 +1603,7 @@ void ieee80211_txq_set_params(struct iee
+ int ieee80211_txq_setup_flows(struct ieee80211_local *local)
+ {
+ 	struct fq *fq = &local->fq;
++	struct ieee80211_hw *hw = &local->hw;
+ 	int ret;
+ 	int i;
+ 	bool supp_vht = false;
+@@ -1630,9 +1631,9 @@ int ieee80211_txq_setup_flows(struct iee
+ 		fq->memory_limit = 4 << 20; /* 4 Mbytes */
+ 
+ 	codel_params_init(&local->cparams);
+-	local->cparams.interval = MS2TIME(100);
+-	local->cparams.target = MS2TIME(20);
+-	local->cparams.ecn = true;
++	local->cparams.interval = MS2TIME(hw->wiphy->cparams.interval);
++	local->cparams.target = MS2TIME(hw->wiphy->cparams.target);
++	local->cparams.ecn = hw->wiphy->cparams.ecn;
+ 
+ 	local->cvars = kcalloc(fq->flows_cnt, sizeof(local->cvars[0]),
+ 			       GFP_KERNEL);

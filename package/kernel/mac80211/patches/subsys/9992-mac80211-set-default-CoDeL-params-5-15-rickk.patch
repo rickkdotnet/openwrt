@@ -1,0 +1,25 @@
+--- a/net/mac80211/main.c
++++ b/net/mac80211/main.c
+@@ -24,6 +24,8 @@
+ #include <net/net_namespace.h>
+ #include <net/cfg80211.h>
+ #include <net/addrconf.h>
++#include <net/codel.h>
++#include <net/codel_impl.h>
+ 
+ #include "ieee80211_i.h"
+ #include "driver-ops.h"
+@@ -1235,6 +1235,13 @@ int ieee80211_register_hw(struct ieee802
+ 
+ 	ieee80211_led_init(local);
+ 
++	/* default CoDeL params */
++	pr_err("%s:%d: %s: setting default CoDeL params for phy\n", __FILE__, __LINE__, __func__);
++	codel_params_init(&hw->wiphy->cparams);
++	hw->wiphy->cparams.target = 5;
++	hw->wiphy->cparams.interval = 50;
++	hw->wiphy->cparams.ecn = true;
++
+ 	result = ieee80211_txq_setup_flows(local);
+ 	if (result)
+ 		goto fail_flows;
