@@ -1,0 +1,142 @@
+# RK /etc/rc.local
+# 
+
+# SCHEDULER 
+#
+
+# Just go full throttle all the time. Somebody on the forums did measurements and
+# it only differed a couple of mW and 1-2 degrees
+# However, changing frequency causes latency and initial bufferbloat sometimes
+echo performance > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor
+echo performance > /sys/devices/system/cpu/cpufreq/policy1/scaling_governor
+
+# NSS 
+#
+
+# Also run the NSS core on full speed
+echo 800000000 > /proc/sys/dev/nss/clock/current_freq
+
+# This controls if NSS accelerates bridged traffic 
+# uncomment if bridge interfaces are acting funny
+#sysctl -w net.bridge.bridge-nf-call-ip6tables=0
+#sysctl -w net.bridge.bridge-nf-call-iptables=0
+
+
+# INTERRUPTS
+#
+# Tuning these makes the difference between 500Mb/s and >750 Mb/s wifi for me
+
+set_irq_affinity() {
+  local name="$1" val="$2"
+  local num
+
+  # NSS created multiple IRQs with the same name, so loop through all instances
+  awk -v name=$name '$7==name{sub(":","");print $1,$7}' /proc/interrupts| while read num irq; do
+    echo "Setting IRQ $num for $irq to $val"
+    echo $val > /proc/irq/$num/smp_affinity
+  done
+}
+
+
+# move the nss_queues (which are related to the ethX interfaces) to the same cpu as
+# the (hardcoded) ath10k interfaces. This gives me the best performance and lowest latenc
+# maybe has something to do with cpu caches
+
+set_irq_affinity nss_queue1 1
+
+# Moving the NSS coreis to 2 balances the sirq load without a noticable impact on i
+# throughput or latency
+set_irq_affinity nss 2
+
+# move these to the lighter loaded cpu1, probably doesn't make much of a difference
+set_irq_affinity qcom_rpm_ack 2
+set_irq_affinity xhci-hcd:usb1 2
+set_irq_affinity xhci-hcd:usb3 2
+
+# DISABLE IPV6
+#
+echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6
+echo 1 > /proc/sys/net/ipv6/conf/default/disable_ipv6
+echo 0 > /proc/sys/net/ipv6/conf/all/forwarding
+echo 0 > /proc/sys/net/ipv6/conf/default/forwarding
+
+# 802.11 AQL 
+#
+# https://forum.openwrt.org/t/aql-and-the-ath10k-is-lovely/59002/302
+
+# I find 1500 the best compromise between throughput and latency 
+for ac in 0 1 2 3; do echo $ac 750 1500 > /sys/kernel/debug/ieee80211/phy0/aql_txq_limit; done
+
+# If the total queue length exceeds this many ms, switch to the lower limit above
+echo 6000 > /sys/kernel/debug/ieee80211/phy0/aql_threshold
+
+# hard limit on the number of packets in the fq_codel queue 
+# default is 8192, this seems a bit excessive 
+echo fq_limit 1000 >/sys/kernel/debug/ieee80211/phy0/aqm
+
+# 802.11 CoDeL
+#
+# 5 seems a bit to agressive sometimes, more testing needed
+iw phy0 set codel target 7
+iw phy0 set codel interval 50
+
+
+# TC 
+#
+
+# this probably doesn't matter but let's be consistent in interval and queue lengths
+tc qdisc add dev eth1 root fq_codel limit 1000 flows 1024 quantum 1514 target 5ms interval 50ms
+
+# Ethernet transmit queue lengths 
+#
+# common wisdom is that this shouldn't make a difference, but as usual 
+# common wisdom is wrong: testing shows that this shaves off about 3ms 
+# latency, even with SQM shapers in place. 
+# eth1 has a big effect, the rest is marginal 
+echo "Changing transmit queue lengths for ethernet interfaces" 
+echo 8 >/sys/class/net/eth0/tx_queue_len
+echo 8 >/sys/class/net/eth1/tx_queue_len
+echo 8 >/sys/class/net/nssifb/tx_queue_len
+
+# NICE
+#
+# We're a router first and foremost, deprioritize everything that's not dealing with traffic
+
+# collectd - stats collection
+if [ ! $(grep 'NICEPRIO=19' /etc/init.d/collectd) ]; then
+  sed -i 's/^NICEPRIO.*/NICEPRIO=19/g' /etc/init.d/collectd
+  # Restart does not pick up the above change right away
+  ( /etc/init.d/collectd stop; sleep 15; /etc/init.d/collectd start) &
+fi
+
+# httpd - webserver
+if [ ! $(grep 'nice -n 19' /etc/init.d/uhttpd) ]; then
+  sed -i "s/procd_set_param command/procd_set_param cshmmand nice -n 19/g" /etc/init.d/uhttpd
+  # Restart does not pick up the above change right away
+  ( /etc/init.d/uhttpd stop; sleep 15; /etc/init.d/uhttpd start) &
+fi
+
+
+# LOGGING
+#
+# dump boot messages before they're out of the bugger, sometimes useful to look back 
+
+dumplog() {
+  local COMMAND="$1" LOGFILE="$2"
+  DATESTAMP=$(date +%Y%m%d-%H%M)
+  LOGDIR=/root/log
+  echo "Dumping output of ${COMMAND} to ${LOGDIR}/${LOGFILE}"
+
+  mkdir -p ${LOGDIR}
+
+  ${COMMAND} > ${LOGDIR}/${LOGFILE}
+  rm ${LOGDIR}/${LOGFILE}
+  ln -s ${LOGDIR}/${LOGFILE}.${DATESTAMP} ${LOGDIR}/${LOGFILE}
+  ls -tp ${LOGDIR}/${LOGFILE}.* | grep -v '/$' | tail -n +11 | while IFS= read -r f; do rm "$f"; done
+
+}
+
+dumplog dmesg dmesg.boot
+dumplog logread log.boot
+
+exit 0
