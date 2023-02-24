@@ -1,0 +1,19 @@
+#!/bin/bash
+
+BRANCH="snapshot"
+
+BUILDROOT="/home/openwrt/openwrt"
+BUILTDIR="$BUILDROOT/../builds"
+
+VERSION_NUMBER=$($BUILDROOT/scripts/getver.sh)
+VERSION_DIST=$(grep CONFIG_VERSION_DIST $BUILDROOT/.config | awk -F\" '{print $2}')
+VERSION_DIST="${VERSION_DIST:=OpenWRT}"
+TARGET_PROFILE=$(grep CONFIG_TARGET_PROFILE $BUILDROOT/.config | awk -F\" '{print $2}' | sed 's/DEVICE_//')
+TARGET_SUBTARGET=$(grep CONFIG_TARGET_SUBTARGET $BUILDROOT/.config | awk -F\" '{print $2}')
+TARGET_BOARD=$(grep CONFIG_TARGET_BOARD $BUILDROOT/.config | awk -F\" '{print $2}')
+
+BUILTBASENAME="${VERSION_DIST}-${BRANCH}-${VERSION_NUMBER}-${TARGET_BOARD}-${TARGET_SUBTARGET}-${TARGET_PROFILE}"
+BUILTBASENAME=$(echo $BUILTBASENAME | sed 's/ /-/g' | awk '{print tolower($0)}')
+
+BINDIR="$BUILDROOT/bin/targets/${TARGET_BOARD}/${TARGET_SUBTARGET}"
+

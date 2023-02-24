@@ -1,0 +1,35 @@
+#!/bin/bash
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+source ${SCRIPT_DIR}/shared
+
+echo "#### `date`: Starting build of $VERSION_DIST $VERSION_NUMBER $1 ####" 
+
+cd $BUILDROOT
+time make -j1 V=s 2>&1 $1 | tee debugbuild.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+
+if [ "${PIPESTATUS[0]}" -ne "0" ]; then
+ echo -en "\007"
+ echo "#### `date`: Build failed, bailing out... last lines of debugbuild.log: " 
+ tail -50 debugbuild.log
+ echo -en "\007"
+ exit 1
+fi
+
+echo -en "\007"
+echo "#### `date`: Build of $VERSION_DIST $VERSION_NUMBER $1 complete ###"
+
+if [ -z $1 ]; then
+	$BUILDROOT/../rkscripts/createbuildinfo
+
+	echo "#### `date`: Moving completed build to $BUILTDIR/$BUILTBASENAME ####"
+
+	mkdir -p $BUILTDIR/$BUILTBASENAME
+	mv -v $BINDIR/$BUILTBASENAME* $BUILTDIR/$BUILTBASENAME
+
+	rm $BUILTDIR/latest
+	ln -s $BUILTDIR/$BUILTBASENAME $BUILTDIR/latest
+
+	echo "All done! Sysupgrade file can be found in"
+	echo $BUILTDIR/latest/$BUILTBASENAME-squashfs-sysupgrade.bin
+done
