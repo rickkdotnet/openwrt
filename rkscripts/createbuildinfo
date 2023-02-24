@@ -1,0 +1,58 @@
+#!/bin/bash 
+# createbuildinfo 
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+source ${SCRIPT_DIR}/shared
+
+STATUSFILE="$BINDIR/$BUILTBASENAME.status"
+DIFFFILE="$BINDIR/$BUILTBASENAME.patch"
+DIFFCONFIGFILE="$BINDIR/$BUILTBASENAME.diffconfig" 
+
+DATE=$(date +%Y%m%d-%H%M)
+
+cd $BUILDROOT
+
+echo "Creating build info for" 
+echo " $BUILTBASENAME in"
+echo " $BINDIR "
+
+getGitInfo() {
+#params: directory 
+ echo "###########################################################################" 
+ (cd $1
+  echo -n "Repo   : "
+  git remote -v show | grep fetch 
+  echo -n "Branch : " 
+  git rev-parse --abbrev-ref HEAD
+  echo -n "Commit : "
+  git show --format="%cd %h %s" --abbrev=7 --date=short | head -n 1 | cut -b1-60 
+  echo "Status : "
+  git status --porcelain
+ )
+}
+
+getGitDiff() {
+ (cd $1
+  git --no-pager diff HEAD 
+ )
+}
+
+
+echo "Generating git statusfile $STATUSFILE" 
+
+echo "Status for $BUILTBASENAME created $DATE" >$STATUSFILE 
+echo " " >>$STATUSFILE
+
+getGitInfo $BUILDROOT >>$STATUSFILE 
+
+for feed in `cat feeds.conf | grep -v "^#" | awk '{print $2}'`
+do
+	getGitInfo $BUILDROOT/feeds/$feed >>${STATUSFILE}
+done
+
+echo "Generating diff file $DIFFFILE"
+getGitDiff $BUILDROOT >$DIFFFILE
+
+echo "Generating diffconfile $DIFFCONFIGFILE"
+$BUILDROOT/scripts/diffconfig.sh > $DIFFCONFIGFILE
+
