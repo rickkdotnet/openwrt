@@ -1,0 +1,25 @@
+#!/bin/sh /etc/rc.common
+
+START=01
+STOP=01
+
+start() {
+  if [ -f /etc/crash-counter ]; then
+    CRASHES=`cat /etc/crash-counter`
+    echo "/etc/crash-counter is present, system was not shutdown cleanly for $CRASHES times"
+    logger -p warn "/etc/crash-counter is present, system was not shutdown cleanly for $CRASHES times" 
+  else
+    CRASHES=0
+  fi
+
+  let "CRASHES=CRASHES+1"
+  echo $CRASHES >/etc/crash-counter
+
+}
+
+
+stop() {
+  logger -p info "This is a clean shutdown, removing /etc/crash-counter"
+  echo "This is a clean shutdown, removing /etc/crash-counter" 
+  rm /etc/crash-counter
+}
