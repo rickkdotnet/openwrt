@@ -1,6 +1,38 @@
 # RK /etc/rc.local
 # 
 
+
+# SAFE MODE to catch bootloops
+# 
+# I have script in /etc/init.d/crash-counter which writes a file on boot and deletes it on 
+# a clean shutdown. If the file is present, it means the system wasn't shutdown cleanly. 
+# If this happens a lot, don't execute the rest of this script
+#
+if [ -f /etc/crash-counter ]; then
+  CRASHES=`cat /etc/crash-counter`
+  if [ $CRASHES -gt 3 ]; then
+    echo "ERROR: System has crashed more than 2 times, not executing rc.local, hope this helps.. " 
+
+    # the nssifb driver can be a bit temperamental too, disable the service so it doesn't get loaded
+    echo "ERROR: Disabling SQM" 
+    service sqm disable
+
+    exit 1
+  else 
+    echo "WARNING: crash counter is present, crash count is $CRASHES"
+  fi
+fi
+
+# RC.ONCE
+#
+# This file is ran once on every new build, ensuring some configurations are in place
+if [ ! -f "/etc/rc.once.ran" ] && [ -f "/etc/rc.once" ]; then
+  echo "Running rc.once, for once." 
+  sh /etc/rc.once
+  touch /etc/rc.once.ran  
+fi 
+
+
 # SCHEDULER 
 #
 
@@ -20,6 +52,30 @@ echo 800000000 > /proc/sys/dev/nss/clock/current_freq
 # uncomment if bridge interfaces are acting funny
 #sysctl -w net.bridge.bridge-nf-call-ip6tables=0
 #sysctl -w net.bridge.bridge-nf-call-iptables=0
+
+
+# CPUSET
+#
+# With cpuset you can control which tasks run on which processor 
+
+# this sometimes fails from rc.local, make it a function so we can try again later below
+set_cpuset() {
+  # enable the functionality
+  echo "+cpuset" >/sys/fs/cgroup/cgroup.subtree_control
+  # OpenWRT conveniently comes with this group already populated with all "extra"
+  # services. Just use that pin it to cpu1, leaving cpu0 free for handling traffic  
+  echo 1 >/sys/fs/cgroup/services/cpuset.cpus
+}
+
+set_cpuset
+if [ ! -f /sys/fs/cgroup/services/cpuset.cpus ]; then 
+  echo "/sys/fs/cgroup/services/cpuset.cpus not present, trying again in 10 seconds"
+  sleep 10
+  set_cpuset
+else
+  echo "/sys/fs/cgroup/services/cpuset.cpus is present, CPUset enabled" 
+fi
+
 
 
 # INTERRUPTS
@@ -76,8 +132,7 @@ echo fq_limit 1000 >/sys/kernel/debug/ieee80211/phy0/aqm
 
 # 802.11 CoDeL
 #
-# 5 seems a bit to agressive sometimes, more testing needed
-iw phy0 set codel target 7
+iw phy0 set codel target 5
 iw phy0 set codel interval 50
 
 
@@ -87,39 +142,22 @@ iw phy0 set codel interval 50
 # this probably doesn't matter but let's be consistent in interval and queue lengths
 tc qdisc add dev eth1 root fq_codel limit 1000 flows 1024 quantum 1514 target 5ms interval 50ms
 
-# Ethernet transmit queue lengths 
+
+# ETHERNET TX QUEUE LENGTHS
 #
-# common wisdom is that this shouldn't make a difference, but as usual 
-# common wisdom is wrong: testing shows that this shaves off about 3ms 
-# latency, even with SQM shapers in place. 
-# eth1 has a big effect, the rest is marginal 
-echo "Changing transmit queue lengths for ethernet interfaces" 
-echo 8 >/sys/class/net/eth0/tx_queue_len
-echo 8 >/sys/class/net/eth1/tx_queue_len
-echo 8 >/sys/class/net/nssifb/tx_queue_len
+# common wisdom is that this shouldn't make a difference, but as usual
+# common wisdom is wrong: testing shows that this shaves off about 3ms
+# latency, even with SQM shapers in place.
+# eth1 has a big effect, the rest is marginal
+echo "Changing transmit queue lengths for ethernet interfaces"
 
-# NICE
-#
-# We're a router first and foremost, deprioritize everything that's not dealing with traffic
-
-# collectd - stats collection
-if [ ! $(grep 'NICEPRIO=19' /etc/init.d/collectd) ]; then
-  sed -i 's/^NICEPRIO.*/NICEPRIO=19/g' /etc/init.d/collectd
-  # Restart does not pick up the above change right away
-  ( /etc/init.d/collectd stop; sleep 15; /etc/init.d/collectd start) &
-fi
-
-# httpd - webserver
-if [ ! $(grep 'nice -n 19' /etc/init.d/uhttpd) ]; then
-  sed -i "s/procd_set_param command/procd_set_param cshmmand nice -n 19/g" /etc/init.d/uhttpd
-  # Restart does not pick up the above change right away
-  ( /etc/init.d/uhttpd stop; sleep 15; /etc/init.d/uhttpd start) &
-fi
+echo 0 >/sys/class/net/eth0/tx_queue_len
+echo 0 >/sys/class/net/eth1/tx_queue_len
 
 
 # LOGGING
 #
-# dump boot messages before they're out of the bugger, sometimes useful to look back 
+# dump boot messages before they're out of the buffer, sometimes useful to look back 
 
 dumplog() {
   local COMMAND="$1" LOGFILE="$2"
