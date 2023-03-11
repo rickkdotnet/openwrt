@@ -1,0 +1,32 @@
+# /etc/rc.once by rickk 
+# 
+# This file is read once per flash by /etc/rc.local to ensure some default settings
+# are in place
+
+# DUMP AP 
+#
+# One of my R7800s is a dump ap, if this script exist, run it to disable and uninstall 
+# all router-specific stuff
+if [ -f /root/bin/immadumbap ]; then
+  echo "Running dumb AP script" 
+  /root/bin/immadumpap
+fi
+
+# DISABLE PACKET STEERING
+# 
+# Disable packet steering, as it causes latency and unpredictable results
+# We'll balance performance manually
+uci set network.globals.packet_steering='0'
+
+# DISABLE IRQBALANCE
+#
+# Similar to packet steering, we'll balance IRQs manually
+uci set irqbalance.irqbalance.enabled='0'
+
+# COMMIT UCI changes
+#
+uci commit
+
+# Let /etc/rc.local know we've ran
+#
+touch /etc/rc.once.ran 
