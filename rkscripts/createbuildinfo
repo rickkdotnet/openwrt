@@ -4,9 +4,17 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source ${SCRIPT_DIR}/shared
 
-STATUSFILE="$BINDIR/$BUILTBASENAME.status"
-DIFFFILE="$BINDIR/$BUILTBASENAME.patch"
-DIFFCONFIGFILE="$BINDIR/$BUILTBASENAME.diffconfig" 
+if [ -n "${1}" ]; then
+  DESTDIR=$1 
+  STATUSFILE="$1/status"
+  DIFFFILE="$1/patch"
+  DIFFCONFIGFILE="$1/diffconfig"
+else
+  DESTDIR="$BINDIR"
+  STATUSFILE="$DESTDIR/$BUILTBASENAME.status"
+  DIFFFILE="$DESTDIR/$BUILTBASENAME.patch"
+  DIFFCONFIGFILE="$DESTDIR/$BUILTBASENAME.diffconfig" 
+fi
 
 DATE=$(date +%Y%m%d-%H%M)
 
@@ -14,7 +22,7 @@ cd $BUILDROOT
 
 echo "Creating build info for" 
 echo " $BUILTBASENAME in"
-echo " $BINDIR "
+echo " $DESTDIR "
 
 getGitInfo() {
 #params: directory 
