@@ -1,6 +1,6 @@
 # RK /etc/rc.local
 # 
-
+# v20230312a 
 
 # SAFE MODE to catch bootloops
 # 
@@ -155,19 +155,40 @@ echo 0 >/sys/class/net/eth0/tx_queue_len
 echo 0 >/sys/class/net/eth1/tx_queue_len
 
 
+# EXTRA BUFFERS vor NLBWMON
+#
+# https://forum.openwrt.org/t/ipq806x-nss-build-netgear-r7800-tp-link-c2600-linksys-ea8500/82525/1783
+sysctl -w net.core.rmem_max=1573376
+sysctl -w net.core.wmem_max=1573376
+
+
 # LOGGING
 #
-# dump boot messages before they're out of the buffer, sometimes useful to look back 
+# dump boot messages before they're out of the bugger, sometimes useful to look back 
 
 dumplog() {
   local COMMAND="$1" LOGFILE="$2"
   DATESTAMP=$(date +%Y%m%d-%H%M)
   LOGDIR=/root/log
-  echo "Dumping output of ${COMMAND} to ${LOGDIR}/${LOGFILE}"
 
   mkdir -p ${LOGDIR}
 
-  ${COMMAND} > ${LOGDIR}/${LOGFILE}
+  # Because most routers don't have a real time clock, openwrt does some magic by looking at the 
+  # last modified file. This means that if the router crashes in short succession, the system comes up with
+  # the same time and the logfile gets overwritten. Add a sequence number in this case
+  if [ -f ${LOGDIR}/${LOGFILE}.${DATESTAMP} ]; then
+    echo "Logfile ${LOGDIR}/${LOGFILE}.${DATESTAMP} already exists" 
+    for I in 0 1 2 3 4 5 6 7 8 9 
+    do
+      if [ ! -f ${LOGDIR}/${LOGFILE}.${DATESTAMP}.${I} ]; then 
+        DATESTAMP=${DATESTAMP}.${I}
+        break
+      fi
+    done
+  fi 
+
+  echo "Dumping output of ${COMMAND} to ${LOGDIR}/${LOGFILE}.${DATESTAMP}"
+  ${COMMAND} > ${LOGDIR}/${LOGFILE}.${DATESTAMP}
   rm ${LOGDIR}/${LOGFILE}
   ln -s ${LOGDIR}/${LOGFILE}.${DATESTAMP} ${LOGDIR}/${LOGFILE}
   ls -tp ${LOGDIR}/${LOGFILE}.* | grep -v '/$' | tail -n +11 | while IFS= read -r f; do rm "$f"; done
