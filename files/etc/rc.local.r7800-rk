@@ -191,11 +191,36 @@ dumplog() {
   ${COMMAND} > ${LOGDIR}/${LOGFILE}.${DATESTAMP}
   rm ${LOGDIR}/${LOGFILE}
   ln -s ${LOGDIR}/${LOGFILE}.${DATESTAMP} ${LOGDIR}/${LOGFILE}
+
+  # keep the 10 latest files
   ls -tp ${LOGDIR}/${LOGFILE}.* | grep -v '/$' | tail -n +11 | while IFS= read -r f; do rm "$f"; done
 
 }
 
 dumplog dmesg dmesg.boot
 dumplog logread log.boot
+
+
+# RAMOOPS
+#
+# Make backup copies of the ramoops files, sometimes it's useful to keep a history to compare them
+bakramoops() {
+  local LOGFILE="$1"
+  LOGDIR=/root/log
+  DATESTAMP=$(date +%Y%m%d-%H%M -r $LOGFILE)
+  FILENAME=$(basename $LOGFILE)
+  DESTNAME=${LOGDIR}/${FILENAME}.${DATESTAMP}
+
+  if [ ! -f ${DESTNAME} ]; then
+    echo "Backing up new ${FILENAME} to ${DESTNAME}"
+    cp ${LOGFILE} ${DESTNAME}
+  fi
+
+  # keep the last 10 files
+  ls -tp ${LOGDIR}/${FILENAME}.* | grep -v '/$' | tail -n +11 | while IFS= read -r f; do rm "$f"; done
+}
+
+bakramoops /sys/fs/pstore/dmesg-ramoops-0
+bakramoops /sys/fs/pstore/dmesg-ramoops-1
 
 exit 0
