@@ -12,6 +12,16 @@ if [ -f /root/bin/immadumbap ]; then
   /root/bin/immadumpap
 fi
 
+# DISABLE SQM HOTPLUG
+#
+# This hotplug script does not make much sense with fixed interfaces (the config can remain in 
+# place when the interface is down), but rescreating the  the nssifb interface on ifup does tend 
+# to crash the system. This avoids the problem. 
+if [ -f /etc/hotplug.d/iface/11-sqm ]; then
+  echo "Removing /etc/hotplug.d/iface/11-sqm. Backup in /tmp if you think this is wrong." 
+  mv /etc/hotplug.d/iface/11-sqm /tmp
+fi  
+
 # DISABLE PACKET STEERING
 # 
 # Disable packet steering, as it causes latency and unpredictable results
