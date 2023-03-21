@@ -9,6 +9,11 @@
 # all router-specific stuff
 if [ -f /root/bin/immadumbap ]; then
   echo "Running dumb AP script" 
+<<<<<<< HEAD
+  /root/bin/immadumbap
+fi
+
+=======
   /root/bin/immadumpap
 fi
 
@@ -22,6 +27,7 @@ if [ -f /etc/hotplug.d/iface/11-sqm ]; then
   mv /etc/hotplug.d/iface/11-sqm /tmp
 fi  
 
+>>>>>>> bb77bb26bd8468e01e043e84c0f1427bc21257db
 # DISABLE PACKET STEERING
 # 
 # Disable packet steering, as it causes latency and unpredictable results
