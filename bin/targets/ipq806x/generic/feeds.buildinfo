@@ -1,0 +1,7 @@
+src-git-full packages https://git.openwrt.org/feed/packages.git^96d261099
+src-git-full luci https://git.openwrt.org/project/luci.git^c7df6e7ea5
+src-git-full routing https://git.openwrt.org/feed/routing.git^1b063f3
+src-git nss https://github.com/qosmio/nss-packages.git^c509082
+src-git sqm_scripts_nss https://github.com/rickkdotnet/sqm-scripts-nss.git^bea0375
+src-git mac80211_web_ucode https://codeberg.org/stintel/mac80211-web-ucode.git^da8117b
+src-git usteer_web_ucode https://codeberg.org/stintel/usteer-web-ucode.git^2d276e4
