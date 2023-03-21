@@ -8,7 +8,11 @@ echo "#### `date`: Starting build of $VERSION_DIST $VERSION_NUMBER ####"
 cd $BUILDROOT
 
 # also add build information to the image 
+<<<<<<< HEAD
+${SCRIPT_DIR}/createbuildinfo files/etc/buildinfo
+=======
 ${SCRIPT_DIR}/createbuildinfo files/etc/buildinfo`
+>>>>>>> bb77bb26bd8468e01e043e84c0f1427bc21257db
 
 # start building
 time make -j4 V=s 2>&1 $1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"

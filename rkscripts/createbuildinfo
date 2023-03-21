@@ -45,6 +45,10 @@ getGitDiff() {
  )
 }
 
+<<<<<<< HEAD
+mkdir -p $DESTDIR
+=======
+>>>>>>> bb77bb26bd8468e01e043e84c0f1427bc21257db
 
 echo "Generating git statusfile $STATUSFILE" 
 
