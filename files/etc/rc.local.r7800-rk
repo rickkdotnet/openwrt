@@ -128,7 +128,7 @@ echo 6000 > /sys/kernel/debug/ieee80211/phy0/aql_threshold
 
 # hard limit on the number of packets in the fq_codel queue 
 # default is 8192, this seems a bit excessive 
-echo fq_limit 1000 >/sys/kernel/debug/ieee80211/phy0/aqm
+echo fq_limit 4096 >/sys/kernel/debug/ieee80211/phy0/aqm
 
 # 802.11 CoDeL
 #
@@ -140,7 +140,7 @@ iw phy0 set codel interval 50
 #
 
 # this probably doesn't matter but let's be consistent in interval and queue lengths
-tc qdisc add dev eth1 root fq_codel limit 1000 flows 1024 quantum 1514 target 5ms interval 50ms
+tc qdisc add dev eth1 root fq_codel limit 8192 flows 1024 quantum 1514 target 5ms interval 50ms
 
 
 # ETHERNET TX QUEUE LENGTHS
@@ -154,6 +154,15 @@ echo "Changing transmit queue lengths for ethernet interfaces"
 echo 0 >/sys/class/net/eth0/tx_queue_len
 echo 0 >/sys/class/net/eth1/tx_queue_len
 
+# ETHERNET OFFLOADS
+#
+# Disable all offloads sinds they usually cause latency and mess with SQM
+# shaves off about 0.5ms on partially loaded wifi too
+for IFACE in eth0 eth1 phy0-ap0 phy1-ap0
+do
+  ethtool -K $IFACE tso off gso off gro off
+done
+
 
 # EXTRA BUFFERS vor NLBWMON
 #
@@ -161,10 +170,38 @@ echo 0 >/sys/class/net/eth1/tx_queue_len
 sysctl -w net.core.rmem_max=1573376
 sysctl -w net.core.wmem_max=1573376
 
+# RAMOOPS
+#
+# Make backup copies of the ramoops files, sometimes it's useful to keep a history to compare them
+bakramoops() {
+  local LOGFILE="$1"
+  LOGDIR=/root/log
+
+  if [ -f ${LOGFILE} ]; then
+
+    DATESTAMP=$(date +%Y%m%d-%H%M -r $LOGFILE)
+    FILENAME=$(basename $LOGFILE)
+    DESTNAME=${LOGDIR}/${FILENAME}.${DATESTAMP}
+
+    if [ ! -f ${DESTNAME} ]; then
+      echo "Backing up new ${FILENAME} to ${DESTNAME}"
+      cp ${LOGFILE} ${DESTNAME}
+    fi
+
+    # keep the last 10 files
+    ls -tp ${LOGDIR}/${FILENAME}.* | grep -v '/$' | tail -n +11 | while IFS= read -r f; do rm "$f"; done
+
+  fi
+
+}
+
+bakramoops /sys/fs/pstore/dmesg-ramoops-0
+bakramoops /sys/fs/pstore/dmesg-ramoops-1
+
 
 # LOGGING
 #
-# dump boot messages before they're out of the bugger, sometimes useful to look back 
+# dump boot messages before they're out of the bugger, sometimes useful to look back
 
 dumplog() {
   local COMMAND="$1" LOGFILE="$2"
@@ -173,19 +210,19 @@ dumplog() {
 
   mkdir -p ${LOGDIR}
 
-  # Because most routers don't have a real time clock, openwrt does some magic by looking at the 
+  # Because most routers don't have a real time clock, openwrt does some magic by looking at the
   # last modified file. This means that if the router crashes in short succession, the system comes up with
   # the same time and the logfile gets overwritten. Add a sequence number in this case
   if [ -f ${LOGDIR}/${LOGFILE}.${DATESTAMP} ]; then
-    echo "Logfile ${LOGDIR}/${LOGFILE}.${DATESTAMP} already exists" 
-    for I in 0 1 2 3 4 5 6 7 8 9 
+    echo "Logfile ${LOGDIR}/${LOGFILE}.${DATESTAMP} already exists"
+    for I in 0 1 2 3 4 5 6 7 8 9
     do
-      if [ ! -f ${LOGDIR}/${LOGFILE}.${DATESTAMP}.${I} ]; then 
+      if [ ! -f ${LOGDIR}/${LOGFILE}.${DATESTAMP}.${I} ]; then
         DATESTAMP=${DATESTAMP}.${I}
         break
       fi
     done
-  fi 
+  fi
 
   echo "Dumping output of ${COMMAND} to ${LOGDIR}/${LOGFILE}.${DATESTAMP}"
   ${COMMAND} > ${LOGDIR}/${LOGFILE}.${DATESTAMP}
@@ -200,27 +237,5 @@ dumplog() {
 dumplog dmesg dmesg.boot
 dumplog logread log.boot
 
-
-# RAMOOPS
-#
-# Make backup copies of the ramoops files, sometimes it's useful to keep a history to compare them
-bakramoops() {
-  local LOGFILE="$1"
-  LOGDIR=/root/log
-  DATESTAMP=$(date +%Y%m%d-%H%M -r $LOGFILE)
-  FILENAME=$(basename $LOGFILE)
-  DESTNAME=${LOGDIR}/${FILENAME}.${DATESTAMP}
-
-  if [ ! -f ${DESTNAME} ]; then
-    echo "Backing up new ${FILENAME} to ${DESTNAME}"
-    cp ${LOGFILE} ${DESTNAME}
-  fi
-
-  # keep the last 10 files
-  ls -tp ${LOGDIR}/${FILENAME}.* | grep -v '/$' | tail -n +11 | while IFS= read -r f; do rm "$f"; done
-}
-
-bakramoops /sys/fs/pstore/dmesg-ramoops-0
-bakramoops /sys/fs/pstore/dmesg-ramoops-1
 
 exit 0
